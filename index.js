@@ -231,7 +231,6 @@ const EXPORT_PROFILE_SETTING_KEYS = Object.freeze([
     'paginateMessages',
     'messagesPerPage',
     'applyCurrentTheme',
-    'includeVisibleDomExtensionCss',
     'customCss',
     'style',
 ]);
@@ -250,7 +249,6 @@ function buildBuiltinExportProfileSettings(styleKey, overrides = {}) {
         paginateMessages: true,
         messagesPerPage: 200,
         applyCurrentTheme: false,
-        includeVisibleDomExtensionCss: true,
         customCss: '',
         style: structuredClone(STYLE_PRESETS[styleKey]?.style ?? STYLE_PRESETS.dark.style),
         ...structuredClone(overrides),
@@ -374,7 +372,6 @@ function normalizeExportProfileSettings(profileKey, profileSettings = {}) {
     normalized.paginateMessages = !!normalized.paginateMessages;
     normalized.messagesPerPage = Math.max(1, Number(normalized.messagesPerPage) || 200);
     normalized.applyCurrentTheme = !!normalized.applyCurrentTheme;
-    normalized.includeVisibleDomExtensionCss = normalized.includeVisibleDomExtensionCss !== false;
     normalized.customCss = String(normalized.customCss ?? '');
     normalized.style = {
         ...structuredClone(fallbackStyle),
@@ -603,6 +600,7 @@ function getExportOptions() {
         showMetadata: true,
         embedAvatars: true,
         lazyRenderMessages: true,
+        includeVisibleDomExtensionCss: true,
         style: {
             ...getProfileFallbackStyle(settings.exportProfile),
             ...settings.style,
@@ -1143,7 +1141,6 @@ function refreshSettingsFields(settings = getSettings()) {
         'includeBackgroundImage',
         'paginateMessages',
         'applyCurrentTheme',
-        'includeVisibleDomExtensionCss',
     ]) {
         const input = document.getElementById(`html_export_${key}`);
         if (input) {
@@ -1278,16 +1275,6 @@ function addSettingsPanel(settings = getSettings()) {
         applySelectedExportProfile(profileSelect.select.value);
     });
 
-    const visibleDomMode = createCheckbox(
-        'html_export_visible_dom_mode',
-        '畫面樣式匯出',
-        settings.exportMode === 'visibleDom',
-    );
-    visibleDomMode.wrapper.classList.add('html_export_standalone_checkbox');
-    visibleDomMode.input.addEventListener('change', () => {
-        updateSetting('exportMode', visibleDomMode.input.checked ? 'visibleDom' : 'complete');
-    });
-
     const alignmentSelect = createSelect(
         'html_export_alignment',
         '訊息對齊',
@@ -1305,19 +1292,30 @@ function addSettingsPanel(settings = getSettings()) {
     checkboxSection.classList.add('html_export_checkbox_grid');
 
     const checkboxSettings = [
+        ['exportMode', '畫面樣式匯出'],
         ['showAvatars', '顯示頭像'],
         ['embedMessageImages', '內嵌訊息圖片'],
-        ['embedExternalImages', '嘗試內嵌外連圖片'],
-        ['includeBackgroundImage', '嘗試匯出聊天室背景圖片'],
+        ['embedExternalImages', '內嵌外連圖片'],
+        ['includeBackgroundImage', '匯出聊天室背景'],
         ['paginateMessages', '分頁顯示訊息'],
-        ['applyCurrentTheme', '完整聊天：嘗試套用目前 ST 樣式'],
-        ['includeVisibleDomExtensionCss', '畫面樣式匯出包含主題擴充 CSS'],
+        ['applyCurrentTheme', '套用目前 ST 樣式'],
     ];
 
     for (const [key, label] of checkboxSettings) {
-        const checkbox = createCheckbox(`html_export_${key}`, label, !!settings[key]);
+        const checked = key === 'exportMode'
+            ? settings.exportMode === 'visibleDom'
+            : !!settings[key];
+        const checkbox = createCheckbox(
+            key === 'exportMode' ? 'html_export_visible_dom_mode' : `html_export_${key}`,
+            label,
+            checked,
+        );
         checkbox.input.addEventListener('change', () => {
-            updateSetting(key, checkbox.input.checked);
+            if (key === 'exportMode') {
+                updateSetting('exportMode', checkbox.input.checked ? 'visibleDom' : 'complete');
+            } else {
+                updateSetting(key, checkbox.input.checked);
+            }
         });
         checkboxSection.append(checkbox.wrapper);
     }
@@ -1504,7 +1502,7 @@ function addSettingsPanel(settings = getSettings()) {
     });
 
     actionRow.append(saveProfileButton, saveAsProfileButton, importProfileButton, exportProfileButton, deleteProfileButton, resetButton, importProfileInput);
-    content.append(description, profileSelect.wrapper, visibleDomMode.wrapper, alignmentSelect.wrapper, checkboxSection, maxAssetSizeField.wrapper, lazyBatchSizeField.wrapper, messagesPerPageField.wrapper, styleTitle, layoutStyleSection.details, colorStyleSection.details, customCssLabel, actionRow);
+    content.append(description, profileSelect.wrapper, alignmentSelect.wrapper, checkboxSection, maxAssetSizeField.wrapper, lazyBatchSizeField.wrapper, messagesPerPageField.wrapper, styleTitle, layoutStyleSection.details, colorStyleSection.details, customCssLabel, actionRow);
     inlineDrawer.append(header, content);
     settingsContainer.append(inlineDrawer);
     refreshSettingsFields(settings);
