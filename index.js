@@ -242,7 +242,7 @@ function buildBuiltinExportProfileSettings(styleKey, overrides = {}) {
         showAvatars: true,
         embedMessageImages: false,
         embedExternalImages: false,
-        includeBackgroundImage: true,
+        includeBackgroundImage: false,
         maxEmbeddedAssetSizeMb: 8,
         lazyRenderMessages: true,
         lazyRenderBatchSize: 80,
