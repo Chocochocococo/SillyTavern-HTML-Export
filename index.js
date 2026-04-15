@@ -275,6 +275,7 @@ const BUILTIN_EXPORT_PROFILES = Object.freeze({
     card: {
         label: '普通ST樣式',
         settings: buildBuiltinExportProfileSettings('card', {
+            includeBackgroundImage: true,
             applyCurrentTheme: true,
         }),
     },
@@ -282,6 +283,7 @@ const BUILTIN_EXPORT_PROFILES = Object.freeze({
         label: '特殊ST樣式',
         settings: buildBuiltinExportProfileSettings('card', {
             exportMode: 'visibleDom',
+            includeBackgroundImage: true,
             applyCurrentTheme: true,
         }),
     },
@@ -302,7 +304,7 @@ const defaultSettings = Object.freeze({
     embedAvatars: true,
     embedMessageImages: false,
     embedExternalImages: false,
-    includeBackgroundImage: true,
+    includeBackgroundImage: false,
     maxEmbeddedAssetSizeMb: 8,
     lazyRenderMessages: true,
     lazyRenderBatchSize: 80,
