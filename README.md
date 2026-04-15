@@ -182,6 +182,8 @@ Export HTML
 下面是一份粉色可愛風格的自訂 CSS 範例。
 
 <details>
+<summary>展開粉色可愛風格自訂 CSS 範例</summary>
+
 ```css
 /* ===== 粉色可愛風格範例 ===== */
 
@@ -443,12 +445,16 @@ body {
 .message-reasoning-content { margin-top: 8px; }
 
 ```
+
 </details>
 
 ## 自訂 CSS 常用選擇器
 
 完整聊天匯出常用選擇器：
+
 <details>
+<summary>展開常用選擇器</summary>
+
 ```css
 body
 .export-page
@@ -489,6 +495,7 @@ body
 .html-export-message-jump-button
 .html-export-jump-status
 ```
+
 </details>
 
 ## Extra
