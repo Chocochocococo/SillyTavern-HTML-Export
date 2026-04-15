@@ -1,0 +1,190 @@
+#html_export_extension_button {
+    cursor: pointer;
+}
+
+#html_export_extension_button .extensionsMenuExtensionButton {
+    min-width: 1.25em;
+    text-align: center;
+}
+
+.html_export_settings .inline-drawer-content {
+    padding: 10px;
+}
+
+.html_export_description {
+    margin-bottom: 10px;
+    opacity: 0.85;
+    line-height: 1.4;
+}
+
+.html_export_setting_row {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.45fr) minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.html_export_setting_row > span {
+    line-height: 1.35;
+}
+
+.html_export_checkbox_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 6px 10px;
+    margin: 10px 0;
+}
+
+.html_export_checkbox {
+    margin: 0;
+}
+
+.html_export_standalone_checkbox {
+    margin: 0 0 8px;
+}
+
+.html_export_settings h4 {
+    margin: 12px 0 8px;
+}
+
+.html_export_style_section {
+    margin: 8px 0;
+    padding: 8px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.16));
+    border-radius: 8px;
+}
+
+.html_export_style_section summary {
+    cursor: pointer;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.html_export_style_section[open] summary {
+    margin-bottom: 8px;
+}
+
+.html_export_style_grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 8px 12px;
+}
+
+.html_export_style_grid .html_export_setting_row {
+    grid-template-columns: minmax(110px, 0.5fr) minmax(0, 1fr);
+    margin-bottom: 0;
+}
+
+.html_export_color_controls {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 72px;
+    gap: 6px;
+    align-items: center;
+}
+
+.html_export_color_picker {
+    width: 36px;
+    height: 28px;
+    min-width: 36px;
+    padding: 0;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.2));
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.html_export_alpha_label {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px;
+    align-items: center;
+    margin: 0;
+    font-size: 12px;
+}
+
+.html_export_alpha_input {
+    min-width: 0;
+}
+
+.html_export_custom_css_row {
+    display: block;
+    margin-top: 12px;
+}
+
+.html_export_custom_css_row > span {
+    display: block;
+    margin-bottom: 4px;
+}
+
+#html_export_custom_css {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    font-family: Consolas, Monaco, monospace;
+}
+
+.html_export_action_row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+#html_export_progress_overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 30000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.58);
+}
+
+.html_export_progress_panel {
+    width: min(420px, 100%);
+    padding: 16px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.2));
+    border-radius: 8px;
+    background: var(--SmartThemeBlurTintColor, var(--SmartThemeBodyColor, #222));
+    color: var(--SmartThemeEmColor, #fff);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+}
+
+.html_export_progress_title {
+    margin-bottom: 8px;
+    font-weight: 700;
+}
+
+.html_export_progress_status {
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.html_export_progress_panel progress {
+    width: 100%;
+    height: 16px;
+}
+
+.html_export_progress_actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+    .html_export_setting_row,
+    .html_export_style_grid .html_export_setting_row {
+        grid-template-columns: 1fr;
+    }
+
+    .html_export_color_controls {
+        grid-template-columns: 36px minmax(0, 1fr);
+    }
+
+    .html_export_alpha_label {
+        grid-column: 1 / -1;
+    }
+}
