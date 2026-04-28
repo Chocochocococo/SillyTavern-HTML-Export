@@ -22,6 +22,7 @@ import { user_avatar } from '../../../personas.js';
 const MODULE_NAME = 'html_export';
 const EXTENSION_NAME = 'SillyTavern-HTML-Export';
 const BUTTON_ID = 'html_export_extension_button';
+const TXT_BUTTON_ID = 'html_export_extension_txt_button';
 const SETTINGS_CONTAINER_ID = 'html_export_settings';
 const PROGRESS_OVERLAY_ID = 'html_export_progress_overlay';
 const EXPORT_BATCH_SIZE = 50;
@@ -1391,6 +1392,14 @@ function addSettingsPanel(settings = getSettings()) {
     const actionRow = document.createElement('div');
     actionRow.classList.add('html_export_action_row');
 
+    const txtExportButton = document.createElement('button');
+    txtExportButton.type = 'button';
+    txtExportButton.classList.add('menu_button');
+    txtExportButton.textContent = 'Export TXT';
+    txtExportButton.addEventListener('click', () => {
+        exportCurrentChatAsTxt();
+    });
+
     const saveProfileButton = document.createElement('button');
     saveProfileButton.type = 'button';
     saveProfileButton.classList.add('menu_button');
@@ -1503,7 +1512,7 @@ function addSettingsPanel(settings = getSettings()) {
         toastr.success('已還原目前 HTML 匯出設定。', 'HTML Export');
     });
 
-    actionRow.append(saveProfileButton, saveAsProfileButton, importProfileButton, exportProfileButton, deleteProfileButton, resetButton, importProfileInput);
+    actionRow.append(txtExportButton, saveProfileButton, saveAsProfileButton, importProfileButton, exportProfileButton, deleteProfileButton, resetButton, importProfileInput);
     content.append(description, profileSelect.wrapper, alignmentSelect.wrapper, checkboxSection, maxAssetSizeField.wrapper, lazyBatchSizeField.wrapper, messagesPerPageField.wrapper, styleTitle, layoutStyleSection.details, colorStyleSection.details, customCssLabel, actionRow);
     inlineDrawer.append(header, content);
     settingsContainer.append(inlineDrawer);
@@ -2720,6 +2729,82 @@ ${avatarHtml}
                     <div class="message-text mes_text">${exportMessageHtml}</div>
                 </div>
             </article>`;
+}
+
+function normalizeTxtLineEndings(value) {
+    return String(value ?? '')
+        .replace(/\r\n|\r/g, '\n')
+        .trimEnd();
+}
+
+function formatTxtMessageText(value, options) {
+    return replaceUserNameText(normalizeTxtLineEndings(value), options);
+}
+
+function buildTxtMessageBlock(message, messageId, options) {
+    if (!shouldExportMessage(message, options)) {
+        return '';
+    }
+
+    const timestamp = options.includeTimestamps ? normalizeTxtLineEndings(message?.send_date ?? '') : '';
+    const sender = normalizeTxtLineEndings(getMessageSenderName(message, options));
+    const rawText = message?.extra?.display_text ?? message?.mes ?? '';
+    const messageText = formatTxtMessageText(rawText, options);
+    const headerParts = [`#${messageId}`, sender || 'Unknown'];
+
+    if (timestamp) {
+        headerParts.push(timestamp);
+    }
+
+    let block = `${headerParts.join(' | ')}\n${messageText}`;
+
+    return block;
+}
+
+async function buildTxtExportParts(options = getExportOptions(), progressController = null, signal = null) {
+    const renderOptions = normalizeUserNameReplacementOptions(options);
+    const exportableMessages = getExportableMessageEntries(renderOptions);
+    const messageRangeLabel = getMessageRangeLabel(renderOptions.messageRange);
+    const header = [
+        `Title: ${getCurrentChatTitle()}`,
+        `Subject: ${getCurrentSubjectName()}`,
+        `Exported: ${getExportDate()}`,
+        `Messages: ${exportableMessages.length}`,
+        ...(messageRangeLabel ? [`Range: ${messageRangeLabel}`] : []),
+        '',
+    ];
+    const parts = [header.join('\n')];
+
+    progressController?.update(0, exportableMessages.length, `Preparing TXT export for ${exportableMessages.length} messages...`);
+
+    for (let start = 0; start < exportableMessages.length; start += EXPORT_BATCH_SIZE) {
+        throwIfExportCancelled(signal);
+
+        const batch = exportableMessages.slice(start, start + EXPORT_BATCH_SIZE);
+        const blocks = [];
+
+        for (const { message, index } of batch) {
+            throwIfExportCancelled(signal);
+
+            const block = buildTxtMessageBlock(message, index, renderOptions);
+            if (block) {
+                blocks.push(block);
+            }
+        }
+
+        if (blocks.length) {
+            parts.push(`\n${blocks.join('\n\n')}\n`);
+        }
+
+        const done = Math.min(start + batch.length, exportableMessages.length);
+        progressController?.update(done, exportableMessages.length, `Prepared ${done} / ${exportableMessages.length} messages...`);
+        await waitForNextFrame();
+    }
+
+    return {
+        parts,
+        count: exportableMessages.length,
+    };
 }
 
 async function buildExportStyles(options = getExportOptions(), signal = null) {
@@ -4266,6 +4351,18 @@ function downloadHtml(html, chatTitle) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function downloadTextFile(parts, chatTitle) {
+    const blob = new Blob(parts, { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${sanitizeFilename(chatTitle)}.txt`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 async function exportCurrentChatAsHtml(options = getExportOptions()) {
     if (!Array.isArray(chat) || chat.length === 0) {
         toastr.warning('目前沒有可匯出的聊天室。', 'HTML Export');
@@ -4320,34 +4417,100 @@ async function exportCurrentChatAsHtml(options = getExportOptions()) {
     return '';
 }
 
-function addExtensionMenuButton() {
-    if (document.getElementById(BUTTON_ID)) {
-        return;
+async function exportCurrentChatAsTxt(options = getExportOptions()) {
+    if (!Array.isArray(chat) || chat.length === 0) {
+        toastr.warning('No chat is loaded to export.', 'TXT Export');
+        return '';
     }
 
+    if (activeExportController) {
+        toastr.warning('An export is already running.', 'TXT Export');
+        return '';
+    }
+
+    const chatTitle = getCurrentChatTitle();
+    const exportedCount = getExportableMessageEntries(options).length;
+    const abortController = new AbortController();
+    const progressController = createProgressController(exportedCount, abortController);
+
+    activeExportController = abortController;
+
+    let txtParts = [];
+
+    try {
+        const result = await buildTxtExportParts(options, progressController, abortController.signal);
+        throwIfExportCancelled(abortController.signal);
+
+        txtParts = result.parts;
+        progressController.update(result.count, result.count, 'Downloading TXT file...');
+        await waitForNextFrame();
+        downloadTextFile(txtParts, chatTitle);
+
+        console.info(`[${EXTENSION_NAME}] Exported ${result.count} chat messages as TXT from "${chatTitle}".`);
+        toastr.success(`Exported ${result.count} messages as TXT.`, 'TXT Export');
+    } catch (error) {
+        if (isAbortError(error)) {
+            console.info(`[${EXTENSION_NAME}] TXT export cancelled.`);
+            toastr.info('TXT export cancelled.', 'TXT Export');
+        } else {
+            console.error(`[${EXTENSION_NAME}] TXT export failed.`, error);
+            toastr.error('TXT export failed. Check the browser console for details.', 'TXT Export');
+        }
+    } finally {
+        progressController.close();
+        txtParts = [];
+        activeExportController = null;
+    }
+
+    return '';
+}
+
+function addExtensionMenuButton() {
     const extensionsMenu = document.getElementById('extensionsMenu');
     if (!extensionsMenu) {
         console.warn(`[${EXTENSION_NAME}] Could not find #extensionsMenu.`);
         return;
     }
 
-    const button = document.createElement('div');
-    button.id = BUTTON_ID;
-    button.classList.add('list-group-item', 'flex-container', 'flexGap5', 'html_export_menu_button');
-    button.title = 'Export the current chat as HTML.';
+    if (!document.getElementById(BUTTON_ID)) {
+        const button = document.createElement('div');
+        button.id = BUTTON_ID;
+        button.classList.add('list-group-item', 'flex-container', 'flexGap5', 'html_export_menu_button');
+        button.title = 'Export the current chat as HTML.';
 
-    const icon = document.createElement('div');
-    icon.classList.add('fa-solid', 'fa-file-export', 'extensionsMenuExtensionButton');
+        const icon = document.createElement('div');
+        icon.classList.add('fa-solid', 'fa-file-export', 'extensionsMenuExtensionButton');
 
-    const label = document.createElement('span');
-    label.textContent = 'Export HTML';
+        const label = document.createElement('span');
+        label.textContent = 'Export HTML';
 
-    button.append(icon, label);
-    button.addEventListener('click', () => {
-        exportCurrentChatAsHtml();
-    });
+        button.append(icon, label);
+        button.addEventListener('click', () => {
+            exportCurrentChatAsHtml();
+        });
 
-    extensionsMenu.append(button);
+        extensionsMenu.append(button);
+    }
+
+    if (!document.getElementById(TXT_BUTTON_ID)) {
+        const txtButton = document.createElement('div');
+        txtButton.id = TXT_BUTTON_ID;
+        txtButton.classList.add('list-group-item', 'flex-container', 'flexGap5', 'html_export_menu_button');
+        txtButton.title = 'Export the current chat as TXT.';
+
+        const txtIcon = document.createElement('div');
+        txtIcon.classList.add('fa-solid', 'fa-file-lines', 'extensionsMenuExtensionButton');
+
+        const txtLabel = document.createElement('span');
+        txtLabel.textContent = 'Export TXT';
+
+        txtButton.append(txtIcon, txtLabel);
+        txtButton.addEventListener('click', () => {
+            exportCurrentChatAsTxt();
+        });
+
+        extensionsMenu.append(txtButton);
+    }
 }
 
 function registerSlashCommands() {
@@ -4378,6 +4541,51 @@ function registerSlashCommands() {
             return '';
         },
         helpString: 'Export the currently opened chat as a standalone HTML file. Optional examples: /html-export 100-300, /html-export username=Anonymous 100-300',
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'username',
+                description: 'replace the user name in exported message names and text',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.STRING],
+            }),
+        ],
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'optional message ID range, e.g. 100-300',
+                isRequired: false,
+                typeList: [ARGUMENT_TYPE.STRING],
+            }),
+        ],
+        returns: 'nothing',
+    }));
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'txt-export',
+        aliases: ['texport'],
+        callback: async (args, rangeInput) => {
+            let messageRange = null;
+
+            try {
+                messageRange = parseMessageRangeInput(rangeInput);
+            } catch (error) {
+                toastr.warning(error.message, 'TXT Export');
+                return '';
+            }
+
+            const usernameReplacement = normalizeOptionalText(args?.username);
+            const options = {
+                ...getExportOptions(),
+                ...(messageRange ? { exportMode: 'complete', messageRange } : {}),
+                ...(usernameReplacement ? {
+                    usernameReplacement,
+                    userNameSearchValues: collectUserNameSearchValues(usernameReplacement),
+                } : {}),
+            };
+
+            await exportCurrentChatAsTxt(options);
+            return '';
+        },
+        helpString: 'Export the currently opened chat as a TXT file. Optional examples: /txt-export 100-300, /txt-export username=Anonymous 100-300',
         namedArgumentList: [
             SlashCommandNamedArgument.fromProps({
                 name: 'username',
